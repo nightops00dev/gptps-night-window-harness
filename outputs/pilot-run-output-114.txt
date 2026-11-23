@@ -1,0 +1,14 @@
+GPTPS pilot pass four - v1.14.0, shutdown_ex + attempts_run
+shutdown handed over 5 dead letters (expect 5)
+  bad1     status=14 attempts=2 attempts_run=1 tail=yes
+  run1     status=12 attempts=3 attempts_run=3 tail=yes
+  lic1     status=12 attempts=2 attempts_run=2 tail=yes
+  queued1  status=13 attempts=1 attempts_run=0 tail=no
+  queued2  status=13 attempts=1 attempts_run=0 tail=no
+5 dead letters handed over before the engine was freed: HOLDS
+exit 2: attempts=2 but attempts_run=1 (NEVER refused #2): HOLDS
+exit 3: attempts=2, attempts_run=2 (both ran): HOLDS
+exit 1: attempts=3, attempts_run=3 (all ran): HOLDS
+queued item cut off by shutdown: E_SHUTDOWN, 0 runs: HOLDS
+tails survive the shutdown handover: HOLDS
+PASS FOUR COMPLETE
