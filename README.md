@@ -18,6 +18,7 @@ any failure, so they can run unattended.
 | `pilot_bench_190.c` | v1.9.0 | EDF start order follows deadlines, not submit order; `shed_late` refuses an already-late job at admission (GPTPS_E_DENIED); dead-letter accounting balances |
 | `pilot_bench_110.c` + `erp_job.c` | v1.10.0, re-verified v1.13.0 | gptps_retry rules: exit 2 -> NEVER (dead-letters at once, retry budget untouched), exit 3 -> delayed retry (469/485 ms measured against a 300 ms rule), exit 1 -> per-policy retries; every dead letter carries the LAST `stderr_tail_bytes` of the child's stderr |
 | `pilot_bench_113_extra.c` + `erp_stop_job.c` + `erp_redrive_job.c` | v1.13.0 | `stop_grace_ms`: cancel mid-run, child catches Ctrl+Break, rolls back, engine reports GPTPS_E_CANCELLED 172 ms after cancel (grace 2000 ms), tail carries ROLLBACK-EVIDENCE; dead-letter re-drive after a licence renewal finishes GPTPS_OK |
+| `pilot_bench_114.c` + `erp_job.c` | v1.14.0 | `gptps_shutdown_ex` hands over every retained dead letter plus the ones the shutdown itself makes (GPTPS_E_SHUTDOWN, attempts_run = 0) before the engine is freed; `attempts_run` is exact on every row (2 scheduled / 1 run for a NEVER-refused retry) |
 
 Sample outputs from actual runs are in `outputs/`.
 
@@ -41,6 +42,11 @@ gcc -O2 -Wall -Iinclude -Iaddons src\*.c pilot_bench_113_extra.c -o pilot_113_ex
 gcc -O2 erp_stop_job.c -o erp_stop_job.exe
 gcc -O2 erp_redrive_job.c -o erp_redrive_job.exe
 pilot_113_extra.exe
+
+rem pass four (shutdown_ex + attempts_run; retry add-on)
+gcc -O2 -Wall -Iinclude -Iaddons src\*.c addons\gptps_retry.c pilot_bench_114.c -o pilot_114.exe
+gcc -O2 erp_job.c -o erp_job.exe
+pilot_114.exe
 ```
 
 (The scheduler add-ons EDF and shed_late both live in `gptps_sched.c`.) The
