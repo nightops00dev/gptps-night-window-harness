@@ -1,0 +1,10 @@
+GPTPS pilot pass one - v1.9.0, EDF + shed_late, single slot
+job        deadline(ms)   started   start_seq  result
+mrp        3600000        yes       3          finished
+rpt_fin    600000         yes       0          finished
+rpt_sales  1200000        yes       1          finished
+rpt_inv    1800000        yes       2          finished
+rpt_stale  1              no        -1         not started
+shed_late refused: 1 (expect 1: rpt_stale)
+dead letters:      1
+EDF order (deadline order, MRP last): HOLDS

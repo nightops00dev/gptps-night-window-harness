@@ -1,0 +1,10 @@
+B night: redrive failed=1 dead=1 status=12
+dead letter: task=erp_redrive attempts=1 status=12 tail=45 bytes
+B morning: re-drive finished=1 status=0
+dead-letter re-drive after licence renewal: HOLDS
+A: cancel -> terminal in 172 ms (grace 2000), status=8 (CANCELLED=8)
+cancelled job reported GPTPS_E_CANCELLED: HOLDS
+stderr tail carries ROLLBACK-EVIDENCE: HOLDS
+stop took 172 ms - rollback happened, inside grace: HOLDS
+total drained dead letters: 1
+PASS THREE COMPLETE

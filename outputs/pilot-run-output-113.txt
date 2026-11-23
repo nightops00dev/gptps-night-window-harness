@@ -1,0 +1,15 @@
+dead letter: bad      attempts=2 status=14 tail=512 bytes evidence=yes
+dead letter: runtime  attempts=3 status=12 tail=512 bytes evidence=yes
+dead letter: licence  attempts=2 status=12 tail=512 bytes evidence=yes
+GPTPS pilot pass two - v1.10.0, gptps_retry + stderr tails, PROGRAM jobs
+good     failed_events=0 terminal=1 status=0 tail=0 evidence=0
+bad      failed_events=1 terminal=1 status=14 tail=1 evidence=1
+licence  failed_events=2 terminal=1 status=12 tail=1 evidence=1
+runtime  failed_events=3 terminal=1 status=12 tail=1 evidence=1
+licence attempt gap: 485 ms (rule: >= 300)
+exit 2 dead-lettered at once, E_DENIED, 1 attempt: HOLDS
+exit 3 waited its extra 300 ms before the retry: HOLDS
+exit 1 retried per policy (3 attempts total): HOLDS
+every dead letter carries its stderr TAIL-EVIDENCE: HOLDS
+the good job finished untouched: HOLDS
+drained dead letters: 3 (expect 3)
