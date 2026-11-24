@@ -8,3 +8,4 @@ rpt_stale  1              no        -1         not started
 shed_late refused: 1 (expect 1: rpt_stale)
 dead letters:      1
 EDF order (deadline order, MRP last): HOLDS
+started=4, shed=1, dead letters=1: HOLDS

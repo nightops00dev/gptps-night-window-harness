@@ -87,11 +87,21 @@ static item *item_by_handle(gptps_handle h)
     return NULL;
 }
 
+/* stderr tails are length-delimited, NOT NUL-terminated: search bounded */
+static int tail_contains(const char *tail, size_t len, const char *needle)
+{
+    size_t n = strlen(needle), i;
+    if (!tail || len < n) return 0;
+    for (i = 0; i + n <= len; ++i)
+        if (memcmp(tail + i, needle, n) == 0) return 1;
+    return 0;
+}
+
 static void note_tail(const char *tail, size_t len, item *it)
 {
     if (!tail || !len) return;
     it->tail_seen = 1;
-    if (len && strstr(tail, "TAIL-EVIDENCE")) it->tail_has_evidence = 1;
+    if (tail_contains(tail, len, "TAIL-EVIDENCE")) it->tail_has_evidence = 1;
 }
 
 static void observe(const gptps_event *ev, void *ud)
@@ -117,12 +127,17 @@ static void inspect_dead_letter(const gptps_dead_letter *dl, void *ud)
 {
     item *it = item_by_handle(dl->handle);
     int *count = (int *)ud;
+    /* the evidence check must be able to FAIL: look for the marker in the
+     * dead letter's own tail, bounded by its length */
+    int evidence = tail_contains(dl->stderr_tail, dl->stderr_tail_len,
+                                 "TAIL-EVIDENCE");
     ++*count;
     if (!it) return;
     printf("dead letter: %-8s attempts=%u status=%d tail=%zu bytes evidence=%s\n",
            it->name, dl->attempts, (int)dl->status, dl->stderr_tail_len,
-           (dl->stderr_tail && strstr(dl->stderr_tail, "TAIL-EVIDENCE")) ? "yes" : "no");
-    if (dl->stderr_tail) { it->tail_seen = 1; it->tail_has_evidence = 1; }
+           evidence ? "yes" : "no");
+    if (dl->stderr_tail) it->tail_seen = 1;
+    if (evidence) it->tail_has_evidence = 1;
 }
 
 int main(void)

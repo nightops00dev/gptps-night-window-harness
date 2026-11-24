@@ -15,6 +15,11 @@
  *
  * MANUAL mode, concurrency 1. Dead letters drained BEFORE gptps_shutdown
  * (the ordering trap pass two documented). Not part of the repo.
+ *
+ * Review fixes (Fikoko, tests/pilot adaptation): tails are length-delimited
+ * and searched bounded; every wait has a wall-clock bound; the licence marker
+ * lives next to the harness exe, not in the current directory, so parallel
+ * runs do not share it.
  */
 #include "gptps.h"
 #include <stdio.h>
@@ -32,6 +37,16 @@ static const char *self_dir(char *out, size_t cap)
     slash = strrchr(out, '\\');
     if (slash) slash[1] = '\0';
     return out;
+}
+
+/* stderr tails are length-delimited, NOT NUL-terminated: search bounded */
+static int tail_contains(const char *tail, size_t len, const char *needle)
+{
+    size_t n = strlen(needle), i;
+    if (!tail || len < n) return 0;
+    for (i = 0; i + n <= len; ++i)
+        if (memcmp(tail + i, needle, n) == 0) return 1;
+    return 0;
 }
 
 /* ---- shared observation state ------------------------------------------ */
@@ -82,8 +97,9 @@ static void observe(const gptps_event *ev, void *ud)
     case GPTPS_EV_FAILED:
         ++o->failed; o->terminal_status = ev->status;
         o->terminal_wall = wall_ms();
-        if (ev->struct_size >= sizeof(gptps_event) && ev->stderr_tail &&
-            strstr(ev->stderr_tail, "ROLLBACK-EVIDENCE"))
+        if (ev->struct_size >= sizeof(gptps_event) &&
+            tail_contains(ev->stderr_tail, ev->stderr_tail_len,
+                          "ROLLBACK-EVIDENCE"))
             o->tail_has_rollback = 1;
         break;
     case GPTPS_EV_DEAD_LETTERED: o->dead = 1; break;
@@ -133,7 +149,7 @@ int main(void)
     gptps *e = NULL;
     gptps_config cfg;
     gptps_task_def d;
-    char dir[1024], prog_long[1200], prog_redrive[1200];
+    char dir[1024], prog_long[1200], prog_redrive[1200], marker[1200];
     const char *argv_long[2], *argv_redrive[2];
     unsigned long long stop_elapsed;
     FILE *f;
@@ -151,6 +167,9 @@ int main(void)
     self_dir(dir, sizeof dir);
     snprintf(prog_long, sizeof prog_long, "%serp_stop_job.exe", dir);
     snprintf(prog_redrive, sizeof prog_redrive, "%serp_redrive_job.exe", dir);
+    /* the marker lives next to the harness, so parallel runs each get their
+     * own - a shared cwd file would make one run "renew" another's licence */
+    snprintf(marker, sizeof marker, "%slicence.renewed", dir);
     argv_long[0] = prog_long; argv_long[1] = NULL;
     argv_redrive[0] = prog_redrive; argv_redrive[1] = NULL;
 
@@ -174,15 +193,21 @@ int main(void)
     REQUIRE(gptps_register_task(e, &d) == GPTPS_OK);
 
     /* --- B: night - licence missing, dead-lettered at once --- */
-    remove("licence.renewed");
+    remove(marker);
     REQUIRE(submit_prog(e, "erp_redrive", &h_redrive) == GPTPS_OK);
-    while (!g_redrive.dead) pump(e, 50);
+    {
+        unsigned long long deadline = wall_ms() + 15000;
+        while (!g_redrive.dead) {
+            pump(e, 50);
+            REQUIRE(wall_ms() < deadline);   /* bounded wait */
+        }
+    }
     printf("B night: redrive failed=%d dead=%d status=%d\n",
            g_redrive.failed, g_redrive.dead, (int)g_redrive.terminal_status);
     REQUIRE(g_redrive.failed == 1 && g_redrive.dead);
 
     /* --- B: morning - licence renewed, drain + re-drive unchanged --- */
-    f = fopen("licence.renewed", "wb");
+    f = fopen(marker, "wb");
     REQUIRE(f != NULL);
     fputs("renewed by the morning operator\n", f);
     fclose(f);
@@ -190,23 +215,34 @@ int main(void)
 
     g_redrive.finished = 0; g_redrive.terminal_status = 0;
     REQUIRE(submit_prog(e, "erp_redrive", &h_redrive) == GPTPS_OK);
-    while (!g_redrive.finished) pump(e, 50);
+    {
+        unsigned long long deadline = wall_ms() + 15000;
+        while (!g_redrive.finished) {
+            pump(e, 50);
+            REQUIRE(wall_ms() < deadline);   /* bounded wait */
+        }
+    }
     printf("B morning: re-drive finished=%d status=%d\n",
            g_redrive.finished, (int)g_redrive.terminal_status);
     t = g_redrive.finished && g_redrive.terminal_status == GPTPS_OK;
     printf("dead-letter re-drive after licence renewal: %s\n", t ? "HOLDS" : "FAILS");
     REQUIRE(t);
-    remove("licence.renewed");
+    remove(marker);
 
     /* --- A: cancel a long job mid-run, Ctrl+Break rollback --- */
     {
         HANDLE th;
+        unsigned long long deadline;
         REQUIRE(submit_prog(e, "erp_long", &h_long) == GPTPS_OK);
         th = CreateThread(NULL, 0, cancel_after_delay, e, 0, NULL);
         REQUIRE(th != NULL);
         /* this pump blocks inside gptps_step while the child runs; the
          * cancel thread interrupts it with Ctrl+Break after 600 ms */
-        while (!g_long.failed && !g_long.finished) pump(e, 50);
+        deadline = wall_ms() + 30000;
+        while (!g_long.failed && !g_long.finished) {
+            pump(e, 50);
+            REQUIRE(wall_ms() < deadline);   /* bounded wait */
+        }
         WaitForSingleObject(th, INFINITE);
         CloseHandle(th);
         REQUIRE(cancel_st == GPTPS_OK);

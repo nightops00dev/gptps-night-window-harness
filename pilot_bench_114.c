@@ -75,6 +75,16 @@ typedef struct {
 static dlrec g_dl[MAXDL];
 static int g_ndl = 0;
 
+/* stderr tails are length-delimited, NOT NUL-terminated: search bounded */
+static int tail_contains(const char *tail, size_t len, const char *needle)
+{
+    size_t n = strlen(needle), i;
+    if (!tail || len < n) return 0;
+    for (i = 0; i + n <= len; ++i)
+        if (memcmp(tail + i, needle, n) == 0) return 1;
+    return 0;
+}
+
 static void on_dl(const gptps_dead_letter *dl, void *ud)
 {
     dlrec *r;
@@ -95,8 +105,8 @@ static void on_dl(const gptps_dead_letter *dl, void *ud)
     r->status = dl->status;
     r->attempts = dl->attempts;
     r->attempts_run = dl->attempts_run;
-    r->tail_evidence = dl->stderr_tail &&
-        strstr(dl->stderr_tail, "TAIL-EVIDENCE") != NULL;
+    r->tail_evidence = tail_contains(dl->stderr_tail, dl->stderr_tail_len,
+                                     "TAIL-EVIDENCE");
 }
 
 static dlrec *find(const char *marker)

@@ -187,8 +187,15 @@ int main(void)
         REQUIRE(inv_ok);
     }
 
+    /* the printed ledger is asserted too, not just shown: 4 jobs started,
+     * exactly one shed refusal, exactly one dead letter */
+    REQUIRE(started_ok == 4);
+    REQUIRE(gptps_sched_shed_count(shed) == 1);
+    REQUIRE(g_dead_letters == 1);
+    printf("started=4, shed=1, dead letters=1: HOLDS\n");
+
     gptps_sched_close(edf);
     gptps_sched_close(shed);
-    (void)started_ok; (void)g_outage;
+    (void)g_outage;
     return 0;
 }
